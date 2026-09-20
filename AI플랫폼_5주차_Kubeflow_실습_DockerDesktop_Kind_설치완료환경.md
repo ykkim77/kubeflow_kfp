@@ -2,31 +2,71 @@
 ## 데이터·ML 파이프라인 — Kubeflow Pipelines
 
 > **실습 전제**  
-> Docker Desktop, `kubectl`, Kind가 이미 설치되어 있고 **Kind Kubernetes Cluster까지 생성되어 정상 동작 중**이라고 가정함.  
-> 따라서 Docker Desktop 설치, Kind 설치, Kind Cluster 생성은 본 실습에서 제외함.
+> 본 실습은 **Docker Desktop에서 Kubernetes 클러스터가 이미 생성되어 있고 정상 동작 중인 상태**에서 시작함.  
+> Kind, Minikube 등 별도의 Kubernetes 클러스터는 생성하지 않음.
 
 ---
 
 # 1. 실습 목표
 
-- 기존 Kind Kubernetes Cluster 상태 확인
-- 현재 `kubectl` Context가 Kind Cluster를 가리키는지 확인
+- Docker Desktop Kubernetes 클러스터 상태 확인
 - Kubeflow Community Distribution 설치
 - Kubeflow Central Dashboard 접속
-- Kubeflow Notebook Server 생성
+- Kubeflow Notebook 생성
 - KFP SDK 설치
-- Component / Pipeline / DAG / Artifact 개념 확인
-- 전처리 → 학습 → 평가 Pipeline 작성
+- `Component`, `Pipeline`, `DAG`, `Artifact`, `Run`, `Experiment` 개념 확인
+- 전처리 → 학습 → 평가 ML Pipeline 작성
 - Pipeline을 KFP v2 IR YAML로 컴파일
-- Kubeflow Pipelines UI에서 Run 실행
-- DAG / Log / Artifact / Metrics / Experiment 확인
+- Kubeflow Pipelines UI에서 Pipeline 실행
+- DAG, Log, Artifact, Metrics 확인
+- 여러 Run을 Experiment에서 비교
 - KFP Task와 Kubernetes Pod의 관계 확인
 
 ---
 
-# 2. 4주차와 5주차의 연결
+# 2. 실습 환경
 
-4주차에서는 Kubernetes Object를 직접 생성하고 확인함.
+이미 다음 환경이 구성되어 있다고 가정함.
+
+```text
+Windows 10/11
+   │
+   └─ Docker Desktop
+         │
+         └─ Kubernetes Cluster
+               │
+               └─ kubectl
+```
+
+본 실습에서 추가로 사용하는 도구:
+
+- Git
+- Kustomize
+- Kubeflow Community Distribution
+- Kubeflow Pipelines SDK
+
+---
+
+# 3. 실습 버전 기준
+
+본 자료는 **2026년 9월 기준** 다음 버전을 사용함.
+
+- Kubeflow Community Distribution: `26.03.1`
+- Kubernetes: `1.35+`
+- Kustomize: `5.8.1`
+- Kubeflow Pipelines Runtime: `2.16.1`
+- KFP SDK: `2.16.1`
+
+> 주의  
+> Docker Desktop Kubernetes Server Version이 너무 낮으면 Kubeflow 설치가 정상적으로 되지 않을 수 있음.
+
+---
+
+# 4. 4주차와 5주차의 연결
+
+## 4주차
+
+Kubernetes Object를 직접 배포함.
 
 ```text
 kubectl
@@ -41,7 +81,9 @@ ReplicaSet
 Pod
 ```
 
-5주차에서는 여러 ML 작업을 Pipeline으로 연결함.
+## 5주차
+
+ML 작업을 Pipeline으로 구성함.
 
 ```text
 preprocess
@@ -53,44 +95,24 @@ preprocess
 evaluate
 ```
 
-Pipeline의 각 Task는 Kubernetes 환경에서 Container 기반으로 실행됨.
+각 Pipeline Task는 Kubernetes 환경에서 Container 기반 작업으로 실행됨.
 
 ```text
-Pipeline
-   ├─ preprocess Task → Container / Pod
-   ├─ train Task      → Container / Pod
-   └─ evaluate Task   → Container / Pod
-```
-
-### 핵심 연결
-
-```text
-3주차: Container
-        ↓
-4주차: Kubernetes Pod / Controller
-        ↓
-5주차: Kubeflow Pipeline Task
+KFP Pipeline
+    │
+    ├─ preprocess Task
+    │      └─ Container / Pod
+    │
+    ├─ train Task
+    │      └─ Container / Pod
+    │
+    └─ evaluate Task
+           └─ Container / Pod
 ```
 
 ---
 
-# 3. 실습 버전 기준
-
-본 자료는 2026년 9월 기준 다음 버전을 기준으로 구성함.
-
-- Kubeflow Community Distribution: `26.03.1`
-- Kubeflow Pipelines: `2.16.1`
-- KFP SDK: `2.16.1`
-- Kustomize: `5.8.x` 계열
-- Kubernetes: Kubeflow 26.03.1 기준 `1.35+`
-
-> 현재 Kind Cluster의 Kubernetes Server Version이 지원 범위보다 낮으면 Kubeflow 설치가 실패할 수 있으므로 반드시 확인함.
-
----
-
-# 4. KFP v2에서 주의할 점
-
-KFP v2는 다음 구조로 Pipeline을 처리함.
+# 5. KFP v2 구조
 
 ```text
 Python DSL
@@ -108,50 +130,19 @@ KFP Backend
 Kubernetes Runtime
 ```
 
-> 과거 KFP v1 설명에서 많이 등장하던 **Argo Workflow YAML을 직접 작성·업로드하는 방식으로 이해하면 안 됨**.  
-> 본 실습에서는 KFP v2의 IR YAML을 사용함.
+> 과거 KFP v1의 Argo Workflow YAML 방식과 구분할 것.
 
 ---
 
-# 5. 이미 준비되어 있는 환경
+# 6. 실습 1 — Docker Desktop 확인
 
-```text
-Windows 10/11
-   │
-   └─ Docker Desktop
-        │
-        └─ Docker Engine
-             │
-             └─ Kind
-                  │
-                  └─ Kubernetes Cluster
-```
-
-이미 설치되어 있다고 가정하는 도구:
-
-- Docker Desktop
-- Docker CLI
-- Kind
-- kubectl
-
-이번 실습에서 추가로 필요한 도구:
-
-- Git
-- Kustomize
-- Kubeflow
-- KFP SDK
-
----
-
-# 6. 실습 1 — Docker Desktop 상태 확인
-
-Windows Terminal에서 PowerShell 실행.
+Windows Terminal 실행.
 
 ```powershell
 docker version
 ```
 
-추가 확인:
+추가 확인.
 
 ```powershell
 docker info
@@ -159,94 +150,48 @@ docker info
 
 ### 확인사항
 
-- Docker Client 정보 출력
-- Docker Server 정보 출력
-- Docker Desktop 실행 상태 정상
+- Docker Desktop 실행 여부
+- Docker Server 정보 정상 출력 여부
 
 ---
 
-# 7. 실습 2 — 기존 Kind Cluster 확인
-
-Kind 버전 확인.
-
-```powershell
-kind version
-```
-
-생성되어 있는 Cluster 확인.
-
-```powershell
-kind get clusters
-```
-
-예:
-
-```text
-kind
-```
-
-또는:
-
-```text
-kubeflow
-```
-
-> Cluster 이름은 실습 환경마다 다를 수 있음.
-
----
-
-# 8. 실습 3 — kubectl Context 확인
-
-현재 Context:
+# 7. 실습 2 — 현재 Kubernetes Context 확인
 
 ```powershell
 kubectl config current-context
 ```
 
-전체 Context:
+Docker Desktop Kubernetes를 사용하고 있다면 일반적으로 다음 Context가 나타남.
+
+```text
+docker-desktop
+```
+
+전체 Context 확인.
 
 ```powershell
 kubectl config get-contexts
 ```
 
-예:
-
-```text
-CURRENT   NAME
-*         kind-kind
-          docker-desktop
-```
-
-Kind Context는 일반적으로 다음 형식임.
-
-```text
-kind-<CLUSTER_NAME>
-```
-
-필요한 경우 Context 변경.
+필요한 경우 Docker Desktop Context로 변경.
 
 ```powershell
-kubectl config use-context kind-kind
+kubectl config use-context docker-desktop
 ```
-
-또는 Cluster 이름이 `kubeflow`인 경우:
-
-```powershell
-kubectl config use-context kind-kubeflow
-```
-
-### 중요
-
-Kubeflow 설치 전에 반드시 **현재 Context가 실습용 Kind Cluster인지 확인**함.
 
 ---
 
-# 9. 실습 4 — Kubernetes Cluster 상태 확인
-
-Node 확인.
+# 8. 실습 3 — Kubernetes Node 확인
 
 ```powershell
 kubectl get nodes
+```
+
+예:
+
+```text
+NAME             STATUS   ROLES           AGE   VERSION
+docker-desktop   Ready    control-plane   ...   v1.xx.x
 ```
 
 상세 확인.
@@ -255,15 +200,13 @@ kubectl get nodes
 kubectl get nodes -o wide
 ```
 
-정상 상태:
+### 확인사항
 
-```text
-STATUS = Ready
-```
+`STATUS`가 `Ready`인지 확인.
 
 ---
 
-# 10. 실습 5 — Kubernetes 버전 확인
+# 9. 실습 4 — Kubernetes Server Version 확인
 
 ```powershell
 kubectl version
@@ -275,100 +218,112 @@ kubectl version
 kubectl version -o yaml
 ```
 
-### 확인사항
+확인할 항목:
 
-- Client Version: `kubectl` 버전
-- Server Version: 실제 Kind Kubernetes 버전
+```text
+Client Version
+Server Version
+```
 
-Kubeflow Community Distribution 26.03.1은 Kubernetes `1.35+` 기준으로 제공됨.
+Kubeflow 26.03.1 실습에서는 Kubernetes Server Version `1.35+` 사용.
 
 ---
 
-# 11. Docker Desktop Resource 확인
+# 10. 실습 5 — 기본 StorageClass 확인
 
-Kubeflow 전체 설치는 일반 Kubernetes 기초 실습보다 많은 자원을 사용함.
+Kubeflow Notebook과 Pipeline은 PVC를 사용할 수 있으므로 StorageClass 확인.
 
-권장:
-
-```text
-CPU    : 8 Core 이상
-Memory : 16 GB 이상
-Disk   : 충분한 여유공간
+```powershell
+kubectl get storageclass
 ```
 
-Docker Desktop에서 Resource 설정 확인.
+축약형:
 
-```text
-Docker Desktop
-   ↓
-Settings
-   ↓
-Resources
+```powershell
+kubectl get sc
 ```
 
-자원이 부족할 경우 다음 문제가 발생할 수 있음.
+확인사항:
+
+- 기본 StorageClass 존재 여부
+- `(default)` 표시 여부
+
+실제 StorageClass 이름은 Docker Desktop 버전에 따라 다를 수 있음.
+
+---
+
+# 11. 실습 6 — 현재 Kubernetes 상태 점검
+
+```powershell
+kubectl get pods -A
+```
+
+다음 상태가 다수 존재하면 먼저 클러스터 상태 확인.
 
 ```text
-Pending
-Evicted
 CrashLoopBackOff
+ImagePullBackOff
+Pending
+Error
 ```
 
 ---
 
-# 12. 실습 6 — Git 확인
+# 12. Docker Desktop Resource 확인
+
+Kubeflow 전체 설치 권장 자원:
+
+```text
+CPU: 8 Core 이상
+Memory: 16 GB 이상
+Disk: 충분한 여유공간
+```
+
+Docker Desktop의 Resources 설정에서 확인.
+
+> 자원이 부족하면 Pod가 `Pending`, `Evicted`, `CrashLoopBackOff` 상태가 될 수 있음.
+
+---
+
+# 13. 실습 7 — Git 확인
 
 ```powershell
 git --version
 ```
 
-Git이 설치되어 있지 않다면 Git for Windows 설치 후 진행.
+Git이 없다면 Git for Windows 설치 필요.
 
 ---
 
-# 13. 실습 7 — Kustomize 확인
+# 14. 실습 8 — Kustomize 확인
 
 ```powershell
 kustomize version
 ```
 
-권장 예:
+권장 버전:
 
 ```text
 v5.8.1
 ```
 
-Kustomize가 없는 경우 공식 Release에서 Windows AMD64 버전을 설치.
+Kustomize가 없다면 공식 Release에서 Windows용 실행 파일 설치.
 
 ```text
 https://github.com/kubernetes-sigs/kustomize/releases
 ```
 
-예:
-
-```text
-kustomize_v5.8.1_windows_amd64.zip
-```
-
-압축을 해제한 `kustomize.exe`를 PATH에 포함된 디렉터리에 배치한 후 다시 확인.
-
-```powershell
-kustomize version
-```
-
 ---
 
-# 14. 실습 8 — Kubeflow Community Distribution 다운로드
+# 15. 실습 9 — Kubeflow Community Distribution 다운로드
 
 작업 디렉터리 이동.
-
-예:
 
 ```powershell
 cd C:\workspace
 ```
 
-Kubeflow 26.03.1 다운로드.
+다운로드.
 
 ```powershell
 git clone --branch 26.03.1 https://github.com/kubeflow/community-distribution.git
@@ -394,46 +349,79 @@ git describe --tags
 
 ---
 
-# 15. 설치 직전 최종 확인
+# 16. 설치 전 Context 재확인
 
 ```powershell
 kubectl config current-context
 kubectl get nodes
 ```
 
-### 체크
-
-- Kind Cluster Context인가?
-- Node가 `Ready`인가?
-- Kubernetes Server Version이 호환되는가?
-- Docker Desktop Resource가 충분한가?
-
-문제가 없다면 Kubeflow 설치 진행.
+Docker Desktop Kubernetes를 사용할 경우 현재 Context가 `docker-desktop`인지 확인.
 
 ---
 
-# 16. 실습 9 — Kubeflow 설치
+# 17. 실습 10 — Kubeflow 설치
 
-```bash
-while ! kustomize build example | kubectl apply --server-side --force-conflicts -f -; do
-  echo "Retrying to apply resources"
-  sleep 20
-done
+현재 Docker Desktop Kubernetes Cluster에 Kubeflow 전체 Manifest 적용.
+
+```powershell
+kustomize build example | kubectl apply --server-side --force-conflicts -f -
 ```
 
-### 참고
+---
 
-Kubeflow는 CRD, Controller, Webhook 등 많은 Resource를 생성함.
+# 18. 첫 실행에서 오류가 발생할 수 있는 이유
 
-CRD가 준비되기 전에 Custom Resource가 적용되면 처음에는 실패할 수 있으므로 반복 적용 방식 사용.
+Kubeflow 설치에는 다음 순서가 필요함.
+
+```text
+CRD 생성
+   │
+   ▼
+CRD 등록
+   │
+   ▼
+Custom Resource 생성
+```
+
+처음 실행 시 CRD가 아직 준비되지 않아 일부 Resource 생성이 실패할 수 있음.
+
+이 경우 같은 명령을 다시 실행.
+
+```powershell
+kustomize build example | kubectl apply --server-side --force-conflicts -f -
+```
+
+필요하면 여러 번 반복.
 
 ---
 
-# 17. 실습 10 — Namespace 확인
+# 19. 왜 같은 apply 명령을 반복해도 되는가?
 
-```bash
+```text
+Manifest
+   │
+   ▼
+Desired State
+   │
+   ▼
+kubectl apply
+   │
+   ▼
+Actual State
+```
+
+`kubectl apply`는 선언적 방식으로 동작하므로 이미 존재하는 Resource는 갱신되고, 없는 Resource는 생성됨.
+
+---
+
+# 20. 실습 11 — Namespace 확인
+
+```powershell
 kubectl get namespaces
 ```
+
+Kubeflow 관련 Namespace 확인.
 
 예:
 
@@ -448,35 +436,52 @@ auth
 
 ---
 
-# 18. 실습 11 — Pod 확인
+# 21. 실습 12 — 전체 Pod 확인
 
 ```powershell
 kubectl get pods -A
 ```
 
-Kubeflow Namespace:
+Kubeflow Namespace만 확인.
 
 ```powershell
 kubectl get pods -n kubeflow
 ```
 
-실시간 확인:
+실시간 확인.
 
 ```powershell
 kubectl get pods -n kubeflow -w
 ```
 
-정상 상태 예:
+종료:
+
+```text
+Ctrl + C
+```
+
+---
+
+# 22. Pod 상태 이해
+
+정상:
 
 ```text
 Running
 Completed
 ```
 
-문제 상태 예:
+설치 과정에서 나타날 수 있음:
 
 ```text
 Pending
+ContainerCreating
+PodInitializing
+```
+
+문제 가능성이 높은 상태:
+
+```text
 CrashLoopBackOff
 ImagePullBackOff
 Error
@@ -484,25 +489,71 @@ Error
 
 ---
 
-# 19. 실습 12 — Kubeflow Dashboard 접속
+# 23. 실습 13 — Kubeflow 주요 Kubernetes Object 확인
 
-Istio Ingress Gateway 확인:
+Deployment:
 
-```bash
+```powershell
+kubectl get deploy -n kubeflow
+```
+
+Service:
+
+```powershell
+kubectl get svc -n kubeflow
+```
+
+Pipeline 관련 Pod:
+
+```powershell
+kubectl get pods -n kubeflow | Select-String pipeline
+```
+
+### 학습 포인트
+
+```text
+Kubeflow
+  ├─ Deployment
+  ├─ Pod
+  ├─ Service
+  ├─ ConfigMap
+  ├─ Secret
+  └─ Custom Resource
+```
+
+Kubeflow 자체도 Kubernetes Object의 조합으로 구성됨.
+
+---
+
+# 24. 실습 14 — Istio Ingress 확인
+
+```powershell
 kubectl get svc -n istio-system
 ```
 
-Port Forward:
+`istio-ingressgateway` Service 확인.
 
-```bash
+---
+
+# 25. 실습 15 — Kubeflow Dashboard 접속
+
+Port Forward 실행.
+
+```powershell
 kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80
 ```
 
-브라우저 접속:
+해당 Terminal은 그대로 유지.
+
+브라우저:
 
 ```text
 http://localhost:8080
 ```
+
+---
+
+# 26. Kubeflow 로그인
 
 기본 실습 계정:
 
@@ -511,13 +562,13 @@ ID: user@example.com
 PW: 12341234
 ```
 
-> 운영환경에서는 기본 계정과 비밀번호를 반드시 변경해야 함.
+> 실습용 기본 계정이며 실제 운영 환경에서는 변경 필요.
 
 ---
 
-# 20. Kubeflow 주요 화면 확인
+# 27. Kubeflow Dashboard 확인
 
-Central Dashboard에서 다음 메뉴 확인.
+다음 메뉴 확인.
 
 - Notebooks
 - Pipelines
@@ -526,30 +577,34 @@ Central Dashboard에서 다음 메뉴 확인.
 - Artifacts
 - Executions
 - Volumes
-- Katib Experiments
+- Katib 관련 메뉴
 - KServe 관련 메뉴
-
-설치 구성에 따라 일부 메뉴 명칭이나 위치가 달라질 수 있음.
 
 ---
 
-# 21. 실습 13 — Notebook Server 생성
+# 28. 실습 16 — Notebook 생성
 
-Dashboard:
+Kubeflow Dashboard:
 
 ```text
 Notebooks
    ↓
-New Notebook / New Server
+New Notebook
 ```
 
-이름:
+또는 UI 버전에 따라 `New Server`.
+
+Notebook 이름:
 
 ```text
 kfp-lab
 ```
 
-권장 설정 예:
+---
+
+# 29. Notebook Resource 설정
+
+예:
 
 ```text
 CPU: 1~2
@@ -559,23 +614,17 @@ Workspace Volume: 10 GiB
 
 Python/Jupyter 기반 Notebook Image 선택.
 
-생성 후:
-
-```text
-CONNECT
-```
-
-선택.
+Notebook이 Ready가 되면 `CONNECT` 선택.
 
 ---
 
-# 22. Notebook과 Kubernetes의 관계
+# 30. Notebook과 Kubernetes 관계
 
 ```text
 Kubeflow Dashboard
        │
        ▼
-Notebook Resource
+Notebook Object
        │
        ▼
 Notebook Controller
@@ -584,20 +633,28 @@ Notebook Controller
 Pod
        │
        ▼
-JupyterLab Container
-```
-
-4주차의 Object / Controller 개념과 동일함.
-
-Notebook Pod 확인:
-
-```bash
-kubectl get pods -A | grep kfp-lab
+Jupyter Container
 ```
 
 ---
 
-# 23. 실습 14 — KFP SDK 설치
+# 31. 실습 17 — Notebook Pod 확인
+
+Windows Terminal 새 탭에서:
+
+```powershell
+kubectl get pods -A
+```
+
+Notebook 이름 검색.
+
+```powershell
+kubectl get pods -A | Select-String kfp-lab
+```
+
+---
+
+# 32. 실습 18 — KFP SDK 설치
 
 JupyterLab Terminal에서:
 
@@ -606,7 +663,7 @@ python --version
 pip show kfp
 ```
 
-필요 시 설치:
+설치:
 
 ```bash
 pip install "kfp==2.16.1"
@@ -626,9 +683,9 @@ python -c "import kfp; print(kfp.__version__)"
 
 ---
 
-# 24. 실습 15 — Notebook 생성
+# 33. 실습 19 — Pipeline Notebook 생성
 
-새 Notebook 파일:
+새 Notebook:
 
 ```text
 simple_ml_pipeline.ipynb
@@ -646,27 +703,21 @@ print("KFP Version:", kfp.__version__)
 
 ---
 
-# 21. Component란?
+# 34. Component란?
 
-Component는 Pipeline의 최소 실행 단위.
+Component는 Pipeline의 최소 작업 단위.
 
 ```text
 Pipeline
-
-preprocess
-    │
-    ▼
-  train
-    │
-    ▼
-evaluate
+   │
+   ├─ preprocess
+   ├─ train
+   └─ evaluate
 ```
-
-KFP v2에서는 Python 함수를 `@dsl.component`로 정의할 수 있음.
 
 ---
 
-# 22. Artifact Type import
+# 35. Artifact Type 불러오기
 
 ```python
 from kfp.dsl import Dataset, Model, Metrics, Input, Output
@@ -677,13 +728,11 @@ from kfp.dsl import Dataset, Model, Metrics, Input, Output
 | Dataset | 데이터셋 |
 | Model | 학습된 모델 |
 | Metrics | 평가 지표 |
-| Artifact | 일반 산출물 |
+| Artifact | 일반적인 산출물 |
 
 ---
 
-# 23. 실습 15 — 전처리 Component
-
-외부 `sample.csv` 의존성을 없애고 Iris Dataset을 Component 내부에서 생성함.
+# 36. 실습 20 — 전처리 Component 작성
 
 ```python
 @dsl.component(
@@ -699,6 +748,7 @@ def preprocess(output_data: Output[Dataset]):
 
     iris = load_iris(as_frame=True)
     df = iris.frame
+
     df = df.rename(columns={"target": "label"})
     df = df.dropna()
 
@@ -711,25 +761,21 @@ def preprocess(output_data: Output[Dataset]):
 
 ---
 
-# 24. preprocess Component 분석
+# 37. preprocess Component 분석
 
-`@dsl.component`
+Component 선언:
 
-```text
-Python Function
-      ↓
-KFP Component
+```python
+@dsl.component
 ```
 
-`base_image`
+Base Image:
 
 ```python
 base_image="python:3.11-slim"
 ```
 
-Component를 실행할 Container Base Image.
-
-`packages_to_install`
+필요 Package:
 
 ```python
 packages_to_install=[
@@ -738,15 +784,11 @@ packages_to_install=[
 ]
 ```
 
-실행에 필요한 Python Package 설치.
-
-`Output[Dataset]`
+Output Artifact:
 
 ```python
 output_data: Output[Dataset]
 ```
-
-Dataset Artifact 생성.
 
 저장:
 
@@ -756,34 +798,35 @@ df.to_csv(output_data.path, index=False)
 
 ---
 
-# 25. 3주차와 연결
-
-3주차:
+# 38. 3주차 Container와 연결
 
 ```text
+3주차
+
 Dockerfile
-   ↓
+   │
+   ▼
 Container Image
+   │
+   ▼
+Container
 ```
 
-5주차:
-
 ```text
+5주차
+
 KFP Component
    ├─ base_image
-   ├─ Python Function
+   ├─ Python Code
    └─ dependencies
-          ↓
+          │
+          ▼
      Container Task
 ```
 
-실제 운영에서는 필요한 라이브러리를 미리 포함한 Custom Image 사용이 일반적임.
-
-본 실습에서는 이해를 위해 `packages_to_install` 사용.
-
 ---
 
-# 26. 실습 16 — 학습 Component
+# 39. 실습 21 — 학습 Component 작성
 
 ```python
 @dsl.component(
@@ -823,19 +866,7 @@ def train(
 
 ---
 
-# 27. Input / Output / Parameter
-
-Input Artifact:
-
-```python
-input_data: Input[Dataset]
-```
-
-Output Artifact:
-
-```python
-output_model: Output[Model]
-```
+# 40. Parameter와 Artifact
 
 Parameter:
 
@@ -843,16 +874,23 @@ Parameter:
 c_value: float = 1.0
 ```
 
+Artifact:
+
+```python
+input_data: Input[Dataset]
+output_model: Output[Model]
+```
+
 | 구분 | Parameter | Artifact |
 |---|---|---|
-| 대상 | 숫자, 문자열, Boolean | Dataset, Model, File |
-| 예 | `C=1.0` | `model.pkl` |
-| 전달 | 값 자체 | 저장소의 산출물 |
-| 용도 | 설정값 | 큰 데이터/파일 |
+| 예 | `C=1.0` | Dataset, Model |
+| 크기 | 작은 값 | 상대적으로 큰 파일 |
+| 전달 | 값 자체 | Artifact Storage |
+| 용도 | 설정값 | 데이터/모델 |
 
 ---
 
-# 28. 실습 17 — 평가 Component
+# 41. 실습 22 — 평가 Component 작성
 
 ```python
 @dsl.component(
@@ -888,50 +926,36 @@ def evaluate(
 
 ---
 
-# 29. Metrics Artifact
+# 42. Metrics Artifact
 
-단순 `print()`:
+단순 출력:
 
-```text
-Log에서 확인 가능
+```python
+print(accuracy)
 ```
 
 Metrics Artifact:
 
 ```python
-metrics: Output[Metrics]
-```
-
-기록:
-
-```python
 metrics.log_metric("accuracy", accuracy)
 ```
 
-구조:
-
-```text
-evaluate
-   ├─ stdout log
-   ├─ accuracy Parameter
-   └─ Metrics Artifact
-```
+Metrics를 사용하면 평가 결과를 Pipeline Metadata와 연결 가능.
 
 ---
 
-# 30. 지금까지의 Component
+# 43. 현재 Component 구조
 
 ```text
 preprocess
-Input : 없음
 Output: Dataset
-        │
-        ▼
+      │
+      ▼
 train
 Input : Dataset
 Output: Model
-        │
-        ▼
+      │
+      ▼
 evaluate
 Input : Dataset + Model
 Output: Accuracy + Metrics
@@ -939,7 +963,7 @@ Output: Accuracy + Metrics
 
 ---
 
-# 31. 실습 18 — Pipeline 정의
+# 44. 실습 23 — Pipeline 정의
 
 ```python
 @dsl.pipeline(
@@ -963,36 +987,7 @@ def simple_pipeline(c_value: float = 1.0):
 
 ---
 
-# 32. Pipeline 코드 분석
-
-1단계:
-
-```python
-prep = preprocess()
-```
-
-2단계:
-
-```python
-trained = train(
-    input_data=prep.outputs["output_data"]
-)
-```
-
-3단계:
-
-```python
-evaluate(
-    input_model=trained.outputs["output_model"],
-    input_data=prep.outputs["output_data"],
-)
-```
-
----
-
-# 33. DAG가 자동으로 만들어지는 이유
-
-단순한 Python 코드 작성 순서가 아니라 **데이터 의존관계**에 의해 실행 순서가 결정됨.
+# 45. Pipeline 코드의 의미
 
 ```text
 preprocess
@@ -1006,13 +1001,11 @@ preprocess
 evaluate
 ```
 
-evaluate는 preprocess의 Dataset도 입력받음.
+데이터 의존관계에 따라 실행 순서가 결정됨.
 
 ---
 
-# 34. DAG 개념
-
-DAG:
+# 46. DAG란?
 
 ```text
 Directed Acyclic Graph
@@ -1024,32 +1017,26 @@ Directed Acyclic Graph
 방향성 비순환 그래프
 ```
 
-Directed:
+예:
 
 ```text
 A → B → C
 ```
 
-Acyclic:
-
-```text
-순환 구조 없음
-```
+순환 구조 없음.
 
 ---
 
-# 35. 실습 19 — Pipeline 컴파일
+# 47. 실습 24 — Pipeline 컴파일
 
 ```python
-from kfp import compiler
-
 compiler.Compiler().compile(
     pipeline_func=simple_pipeline,
     package_path="simple_pipeline.yaml",
 )
 ```
 
-생성 파일:
+생성:
 
 ```text
 simple_pipeline.yaml
@@ -1057,33 +1044,34 @@ simple_pipeline.yaml
 
 ---
 
-# 36. KFP v2 IR YAML
+# 48. KFP v2 IR YAML 의미
 
 ```text
 Python DSL
-   ↓
+   │
+   ▼
 KFP Compiler
-   ↓
+   │
+   ▼
 IR YAML
-   ↓
+   │
+   ▼
 KFP Backend
-   ↓
-Kubernetes Runtime
 ```
 
-4주차에서는 Deployment YAML을 직접 작성했지만, 5주차에서는 Python Pipeline을 Compiler가 IR YAML로 변환함.
+4주차에서는 Deployment YAML을 직접 작성했지만 5주차에서는 Python Pipeline을 Compiler가 IR YAML로 변환함.
 
 ---
 
-# 37. YAML 확인
+# 49. 실습 25 — YAML 확인
 
-Notebook Terminal:
+JupyterLab Terminal:
 
 ```bash
 head -n 40 simple_pipeline.yaml
 ```
 
-또는 Python:
+또는 Notebook:
 
 ```python
 with open("simple_pipeline.yaml", "r") as f:
@@ -1096,35 +1084,7 @@ with open("simple_pipeline.yaml", "r") as f:
 
 ---
 
-# 38. 4주차와 YAML 비교
-
-4주차:
-
-```text
-사용자
-  ↓
-deployment.yaml 직접 작성
-  ↓
-kubectl apply
-```
-
-5주차:
-
-```text
-사용자
-  ↓
-Python Pipeline
-  ↓
-KFP Compiler
-  ↓
-pipeline.yaml
-  ↓
-KFP Backend
-```
-
----
-
-# 39. 실습 20 — Pipeline YAML 다운로드
+# 50. 실습 26 — Pipeline YAML 다운로드
 
 JupyterLab File Browser에서:
 
@@ -1132,21 +1092,21 @@ JupyterLab File Browser에서:
 simple_pipeline.yaml
 ```
 
-다운로드.
+선택 후 다운로드.
 
 ---
 
-# 40. 실습 21 — Pipeline 업로드
+# 51. 실습 27 — Pipelines 메뉴 이동
 
-Kubeflow Dashboard:
+Kubeflow Dashboard에서 `Pipelines` 선택.
 
-```text
-Pipelines
-  ↓
-Upload Pipeline
-```
+---
 
-Pipeline 이름:
+# 52. 실습 28 — Pipeline 업로드
+
+`Upload Pipeline` 선택.
+
+Pipeline Name:
 
 ```text
 simple-ml-pipeline
@@ -1158,13 +1118,20 @@ simple-ml-pipeline
 simple_pipeline.yaml
 ```
 
-업로드.
+---
+
+# 53. Pipeline / Run / Experiment
+
+| 개념 | 의미 |
+|---|---|
+| Component | 하나의 작업 정의 |
+| Pipeline | 여러 Component를 연결한 Workflow |
+| Run | Pipeline의 1회 실행 |
+| Experiment | 여러 Run을 그룹화 |
 
 ---
 
-# 41. 실습 22 — Experiment 생성
-
-Dashboard:
+# 54. 실습 29 — Experiment 생성
 
 ```text
 Experiments
@@ -1178,47 +1145,13 @@ Create Experiment
 iris-experiment
 ```
 
-구조:
-
-```text
-Experiment
-   ├─ Run 1
-   ├─ Run 2
-   └─ Run 3
-```
-
 ---
 
-# 42. Pipeline / Run / Experiment
+# 55. 실습 30 — 첫 Run 실행
 
-| 개념 | 의미 |
-|---|---|
-| Pipeline | 실행할 ML Workflow 정의 |
-| Run | Pipeline 1회 실행 |
-| Experiment | 여러 Run을 묶는 그룹 |
+Pipeline 선택 → `Create Run`.
 
-예:
-
-```text
-simple-ml-pipeline
-       ↓
-iris-experiment
-   ├─ Run(C=0.1)
-   ├─ Run(C=1.0)
-   └─ Run(C=10.0)
-```
-
----
-
-# 43. 실습 23 — 첫 Run 실행
-
-Pipeline 선택:
-
-```text
-Create Run
-```
-
-Run 이름:
+Run Name:
 
 ```text
 iris-run-c1
@@ -1240,15 +1173,15 @@ c_value = 1.0
 
 ---
 
-# 44. DAG 시각화 확인
-
-Run 화면에서:
+# 56. 실습 31 — DAG 시각화 확인
 
 ```text
 preprocess
-    ↓
+    │
+    ▼
   train
-    ↓
+    │
+    ▼
 evaluate
 ```
 
@@ -1264,44 +1197,55 @@ Succeeded
 
 ---
 
-# 45. Kubernetes에서 실행 확인
+# 57. 실습 32 — Kubernetes Pod 확인
 
-Host Terminal:
+Windows Terminal에서:
 
 ```powershell
 kubectl get pods -A
 ```
 
-사용자 Profile Namespace를 알고 있다면:
-
-```bash
-kubectl get pods -n <PROFILE_NAMESPACE>
-```
-
 실시간:
 
-```bash
+```powershell
 kubectl get pods -A -w
 ```
 
-### 학습 포인트
-
-KFP Component는 실제 Kubernetes 환경에서 Container 기반 Task로 실행됨.
+Pipeline 실행 시 Task Pod 생성 확인.
 
 ---
 
-# 46. Component와 Task의 차이
+# 58. KFP Task와 Kubernetes 관계
+
+```text
+Pipeline
+   │
+   ▼
+Task
+   │
+   ▼
+Container
+   │
+   ▼
+Kubernetes Pod
+```
+
+KFP는 Kubernetes를 대체하지 않고 Kubernetes 위에 ML Workflow 계층을 제공함.
+
+---
+
+# 59. Component와 Task 차이
 
 Component:
 
 ```text
-작업의 정의
+작업 정의
 ```
 
 Task:
 
 ```text
-Pipeline 안에서 Component를 호출해 생성한 실행 단위
+Pipeline 안에서 Component를 호출한 실행 단위
 ```
 
 예:
@@ -1322,7 +1266,7 @@ trained = train(...)
 
 ---
 
-# 47. 실습 24 — preprocess Log 확인
+# 60. 실습 33 — preprocess Log 확인
 
 Run DAG에서 `preprocess` 선택.
 
@@ -1333,15 +1277,9 @@ Run DAG에서 `preprocess` 선택.
 Dataset shape: (150, 5)
 ```
 
-확인사항:
-
-- 독립적인 Task 실행
-- Dataset 생성
-- 단계별 Log 확인
-
 ---
 
-# 48. 실습 25 — train Log 확인
+# 61. 실습 34 — train Log 확인
 
 `train` 선택.
 
@@ -1354,7 +1292,7 @@ C = 1.0
 
 ---
 
-# 49. 실습 26 — evaluate Log 확인
+# 62. 실습 35 — evaluate Log 확인
 
 `evaluate` 선택.
 
@@ -1364,34 +1302,9 @@ C = 1.0
 Accuracy: 0.xxxx
 ```
 
-정확한 값은 실행 환경과 Library 버전에 따라 달라질 수 있음.
-
 ---
 
-# 50. 실패한 Pipeline 디버깅
-
-Task 실패 시:
-
-1. Logs 확인
-2. Input 확인
-3. Output 확인
-4. Artifact 확인
-5. Kubernetes Pod 확인
-6. Events 확인
-
-Kubernetes:
-
-```bash
-kubectl get pods -A
-kubectl describe pod <POD_NAME> -n <NAMESPACE>
-kubectl logs <POD_NAME> -n <NAMESPACE>
-```
-
----
-
-# 51. 실습 27 — Artifact 확인
-
-각 Task의 Artifact 확인.
+# 63. 실습 36 — Artifact 확인
 
 ```text
 preprocess → Dataset
@@ -1399,24 +1312,29 @@ train      → Model
 evaluate   → Metrics
 ```
 
-전체 관계:
+전체 흐름:
 
 ```text
-preprocess
-   └─ Dataset
-       ↓
-      train
-       └─ Model
-           ↓
-        evaluate
-           └─ Metrics
+Dataset
+   │
+   ▼
+ train
+   │
+   ▼
+ Model
+   │
+   ▼
+evaluate
+   │
+   ▼
+Metrics
 ```
 
 ---
 
-# 52. Artifact란?
+# 64. Artifact란?
 
-Artifact는 Pipeline 실행 중 생성되는 데이터 또는 파일 형태 산출물.
+Pipeline 실행 중 생성되는 데이터/파일 형태 산출물.
 
 예:
 
@@ -1427,78 +1345,37 @@ Artifact는 Pipeline 실행 중 생성되는 데이터 또는 파일 형태 산�
 - Metrics
 - TensorBoard Log
 
-Parameter와 구분해야 함.
-
 ---
 
-# 53. Pipeline Root와 Artifact Storage
-
-개념:
+# 65. ML Metadata와 Lineage
 
 ```text
-Pipeline
- ├─ Task A → Dataset
- ├─ Task B → Model
- └─ Task C → Metrics
-               ↓
-        Artifact Storage
-```
-
-실제 저장소는 배포 환경에 따라 다음과 같이 구성 가능.
-
-- MinIO
-- S3-compatible Storage
-- Cloud Object Storage
-
----
-
-# 54. ML Metadata
-
-ML Metadata는 실행과 Artifact 관계를 기록함.
-
-```text
-Dataset A
-   ↓
+Dataset
+   │
+   ▼
 preprocess execution
-   ↓
-Dataset B
-   ↓
+   │
+   ▼
+Dataset
+   │
+   ▼
 train execution
-   ↓
-Model A
-   ↓
+   │
+   ▼
+Model
+   │
+   ▼
 evaluate execution
-   ↓
+   │
+   ▼
 Metrics
 ```
 
----
-
-# 55. ML Lineage
-
-Lineage:
-
-```text
-데이터와 모델이 어떤 과정을 거쳐 생성되었는지에 대한 계보
-```
-
-예:
-
-```text
-Model v3
-   ↓
-Train Run #25
-   ↓
-Dataset Version #7
-   ↓
-Preprocess Execution
-```
-
-재현성과 추적성을 높임.
+Lineage는 어떤 데이터와 실행을 거쳐 모델이 생성되었는지를 나타내는 계보임.
 
 ---
 
-# 56. 실습 28 — Artifacts / Executions 메뉴 확인
+# 66. 실습 37 — Artifacts / Executions 확인
 
 Dashboard에서:
 
@@ -1512,7 +1389,7 @@ Artifacts
 - Model
 - Metrics
 
-또한:
+다음:
 
 ```text
 Executions
@@ -1520,12 +1397,11 @@ Executions
 
 확인:
 
-- 각 Task의 실행 이력
-- Artifact 생성 관계
+- Component / Task 실행 이력
 
 ---
 
-# 57. 실습 29 — 두 번째 Run
+# 67. 실습 38 — 두 번째 Run
 
 Parameter:
 
@@ -1547,7 +1423,7 @@ iris-experiment
 
 ---
 
-# 58. 실습 30 — 세 번째 Run
+# 68. 실습 39 — 세 번째 Run
 
 Parameter:
 
@@ -1569,261 +1445,96 @@ iris-experiment
 
 ---
 
-# 59. Experiment에서 비교
+# 69. 실습 40 — Experiment 비교
 
 ```text
 iris-experiment
 
-├─ iris-run-c01  C=0.1
-├─ iris-run-c1   C=1.0
-└─ iris-run-c10  C=10.0
+├─ iris-run-c01   C=0.1
+├─ iris-run-c1    C=1.0
+└─ iris-run-c10   C=10.0
 ```
 
-비교 항목:
+비교:
 
 - Parameter
 - 실행 시간
-- Task 상태
+- 성공/실패
 - Accuracy
-- Metrics Artifact
-- Log
+- Metrics
+- Logs
 
 ---
 
-# 60. 5주차와 6주차 연결
+# 70. 5주차와 Katib 연결
 
 5주차:
 
 ```text
-사람이 C 값을 지정
-  ├─ 0.1
-  ├─ 1.0
-  └─ 10.0
+사람이 Parameter 변경
+C=0.1
+C=1.0
+C=10.0
 ```
 
-6주차 Katib:
+6주차:
 
 ```text
 Search Space
-    ↓
+    │
+    ▼
 Katib
+    │
     ├─ Trial 1
     ├─ Trial 2
     ├─ Trial 3
     └─ ...
 ```
 
-Hyperparameter 탐색 자동화.
-
 ---
 
-# 61. KServe 연결
-
-현재:
+# 71. 5주차와 KServe 연결
 
 ```text
 preprocess
-   ↓
- train
-   ↓
-evaluate
-```
-
-6주차 이후:
-
-```text
-preprocess
-   ↓
- train
-   ↓
-evaluate
-   ↓
-model deploy
-   ↓
-KServe
-```
-
----
-
-# 62. Pipeline의 4대 이점
-
-## 재현성
-
-```text
-동일 Pipeline 정의
-      ↓
-동일한 DAG
-      ↓
-동일한 실행 단계
-```
-
-## 자동화
-
-```text
-Run 시작
-  ↓
-preprocess
-  ↓
+   │
+   ▼
 train
-  ↓
+   │
+   ▼
 evaluate
-```
-
-## 재사용성
-
-한 Component를 여러 Pipeline에서 재사용 가능.
-
-## 추적성
-
-```text
-Run
- ├─ Input
- ├─ Parameter
- ├─ Artifact
- ├─ Log
- └─ Metrics
+   │
+   ▼
+KServe
+   │
+   ▼
+Model Serving
 ```
 
 ---
 
-# 63. Component / Pipeline / Run / Experiment 정리
+# 72. 실습 41 — Pipeline 실패 실습
 
-```text
-Component
-   ↓
-Pipeline
-   ↓
-Run
-   ↓
-Experiment
-```
-
-더 정확히는:
-
-```text
-여러 Component → 하나의 Pipeline
-하나의 Pipeline → 여러 Run
-여러 Run → 하나의 Experiment에서 그룹화 가능
-```
-
----
-
-# 64. KFP 전체 구조
-
-```text
-사용자
-  ↓
-Python SDK
-  ↓
-@dsl.component / @dsl.pipeline
-  ↓
-KFP Compiler
-  ↓
-IR YAML
-  ↓
-KFP Backend
-  ↓
-Kubernetes
-  ↓
-Container Task
-
-실행 결과
-  ├─ Run
-  ├─ Artifact
-  ├─ Metrics
-  └─ Metadata / Lineage
-```
-
----
-
-# 65. 3주차·4주차·5주차 연결
-
-3주차:
-
-```text
-Application
-   ↓
-Container Image
-   ↓
-Container
-```
-
-4주차:
-
-```text
-Container
-   ↓
-Pod
-   ↓
-Deployment / Service
-```
-
-5주차:
-
-```text
-Container 기반 ML Task
-   ↓
-Component
-   ↓
-Pipeline
-   ↓
-DAG
-```
-
----
-
-# 66. 실습 31 — KFP 관련 Kubernetes Resource 확인
-
-```bash
-kubectl get pods -n kubeflow
-kubectl get pods -n kubeflow | grep pipeline
-kubectl get svc -n kubeflow | grep pipeline
-kubectl get deploy -n kubeflow | grep pipeline
-```
-
-### 학습 포인트
-
-Kubeflow Pipelines 자체도 Kubernetes Deployment, Pod, Service 등의 조합으로 실행됨.
-
----
-
-# 67. 실습 32 — Pipeline 실행 중 Pod 관찰
-
-Run 시작 직후:
-
-```bash
-kubectl get pods -A -w
-```
-
-관찰:
-
-```text
-Task 시작
-   ↓
-Pod 생성
-   ↓
-Container 실행
-   ↓
-작업 수행
-   ↓
-Artifact 생성
-   ↓
-Task 완료
-```
-
----
-
-# 68. 실습 33 — 장애 실습
-
-전처리 코드를 일부러 잘못 변경.
-
-예:
+전처리 코드를 일부러 변경.
 
 ```python
 df = pd.read_csv("/not-exist.csv")
 ```
 
-컴파일 후 실행.
+다시 컴파일.
+
+```python
+compiler.Compiler().compile(
+    pipeline_func=simple_pipeline,
+    package_path="simple_pipeline_error.yaml",
+)
+```
+
+업로드 후 실행.
+
+---
+
+# 73. 실패 결과 확인
 
 예상:
 
@@ -1833,45 +1544,45 @@ train      → 실행되지 않음
 evaluate   → 실행되지 않음
 ```
 
-이유:
-
-```text
-preprocess
-   X
- train
-   ↓
-evaluate
-```
-
-DAG 의존관계가 있기 때문.
+DAG Data Dependency 때문에 앞 단계 실패 시 뒤 단계가 실행되지 않음.
 
 ---
 
-# 69. 장애 로그 확인
+# 74. 실습 42 — 실패 Log 확인
 
-실패 Task의 Logs에서:
+실패한 `preprocess` Task의 Logs 확인.
+
+예:
 
 ```text
 FileNotFoundError
 ```
 
-확인.
+---
 
-### 학습 포인트
+# 75. Kubernetes에서도 오류 확인
 
-Pipeline은 실패 위치와 로그를 단계별로 추적할 수 있음.
+```powershell
+kubectl get pods -A
+```
+
+상세:
+
+```powershell
+kubectl describe pod <POD_NAME> -n <NAMESPACE>
+```
+
+Log:
+
+```powershell
+kubectl logs <POD_NAME> -n <NAMESPACE>
+```
 
 ---
 
-# 70. 실습 34 — 정상 코드로 복구
+# 76. 실습 43 — 정상 코드 복구
 
-다시:
-
-```python
-iris = load_iris(as_frame=True)
-```
-
-컴파일:
+정상 코드로 복구 후 재컴파일.
 
 ```python
 compiler.Compiler().compile(
@@ -1882,7 +1593,99 @@ compiler.Compiler().compile(
 
 ---
 
-# 71. 전체 실습 코드
+# 77. Pipeline의 4대 이점
+
+## 재현성
+
+동일 Pipeline 정의로 동일 실행 흐름 유지.
+
+## 자동화
+
+```text
+Run
+ ↓
+preprocess
+ ↓
+train
+ ↓
+evaluate
+```
+
+## 재사용성
+
+Component를 다른 Pipeline에서도 재사용 가능.
+
+## 추적성
+
+```text
+Run
+ ├─ Parameter
+ ├─ Log
+ ├─ Artifact
+ ├─ Metrics
+ └─ Metadata
+```
+
+---
+
+# 78. 전체 KFP 구조
+
+```text
+사용자
+  │
+  ▼
+Python SDK
+  │
+  ▼
+Component / Pipeline
+  │
+  ▼
+KFP Compiler
+  │
+  ▼
+IR YAML
+  │
+  ▼
+KFP Backend
+  │
+  ▼
+Docker Desktop Kubernetes
+  │
+  ▼
+Container Task / Pod
+
+실행 결과
+  ├─ Run
+  ├─ Log
+  ├─ Artifact
+  ├─ Metrics
+  └─ Metadata
+```
+
+---
+
+# 79. 3주차·4주차·5주차 연결
+
+```text
+3주차
+Container
+   │
+   ▼
+4주차
+Kubernetes Pod
+   │
+   ▼
+5주차
+KFP Component / Task
+   │
+   ▼
+6주차
+Katib / KServe
+```
+
+---
+
+# 80. 전체 Pipeline 코드
 
 ```python
 import kfp
@@ -1939,7 +1742,11 @@ def train(
     X = df.drop("label", axis=1)
     y = df["label"]
 
-    model = LogisticRegression(C=c_value, max_iter=300)
+    model = LogisticRegression(
+        C=c_value,
+        max_iter=300,
+    )
+
     model.fit(X, y)
 
     joblib.dump(model, output_model.path)
@@ -1972,6 +1779,7 @@ def evaluate(
     y = df["label"]
 
     accuracy = float(model.score(X, y))
+
     metrics.log_metric("accuracy", accuracy)
 
     print(f"Accuracy: {accuracy:.4f}")
@@ -2010,314 +1818,260 @@ print("Pipeline compile 완료")
 
 ---
 
-# 72. 자주 사용하는 명령어
+# 81. 자주 사용하는 명령어
 
 | 목적 | 명령 |
 |---|---|
+| Context 확인 | `kubectl config current-context` |
+| Context 목록 | `kubectl config get-contexts` |
+| Node 확인 | `kubectl get nodes` |
+| Kubernetes 버전 | `kubectl version` |
+| StorageClass | `kubectl get sc` |
 | Namespace | `kubectl get ns` |
 | 전체 Pod | `kubectl get pods -A` |
 | Kubeflow Pod | `kubectl get pods -n kubeflow` |
-| Service | `kubectl get svc -n kubeflow` |
-| Pipeline Pod 검색 | `kubectl get pods -n kubeflow | Select-String pipeline` |
-| Pod 실시간 확인 | `kubectl get pods -A -w` |
+| Kubeflow Service | `kubectl get svc -n kubeflow` |
+| 실시간 Pod | `kubectl get pods -A -w` |
 | Pod 상세 | `kubectl describe pod POD -n NAMESPACE` |
 | Pod Log | `kubectl logs POD -n NAMESPACE` |
-| KFP SDK 버전 | `python -c "import kfp; print(kfp.__version__)"` |
+| KFP 버전 | `python -c "import kfp; print(kfp.__version__)"` |
 
 ---
 
-# 73. 오류 1 — Pod Pending
+# 82. 주요 오류 대응
 
-```bash
-kubectl get pods -A
+## 잘못된 Context
+
+```powershell
+kubectl config current-context
+kubectl config use-context docker-desktop
+kubectl get nodes
+```
+
+## Kubernetes 버전 불일치
+
+```powershell
+kubectl version
+```
+
+Kubeflow 26.03.1은 Kubernetes 1.35+ 기준으로 사용.
+
+## Pod Pending
+
+```powershell
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 ```
 
-가능 원인:
+확인:
 
-- CPU 부족
-- Memory 부족
-- PVC Pending
-- StorageClass 없음
-- Scheduling 조건 불충족
+- CPU
+- Memory
+- PVC
+- StorageClass
+- Scheduling
 
----
+## PVC Pending
 
-# 74. 오류 2 — ImagePullBackOff
+```powershell
+kubectl get pvc -A
+kubectl get sc
+kubectl describe pvc <PVC_NAME> -n <NAMESPACE>
+```
 
-```bash
+## ImagePullBackOff
+
+```powershell
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 ```
 
-가능 원인:
+## CrashLoopBackOff
 
-- Image 이름 오류
-- Registry 접근 실패
-- Docker Hub Rate Limit
-- Private Registry 인증 실패
-- CPU Architecture 불일치
-
----
-
-# 75. 오류 3 — CrashLoopBackOff
-
-```bash
+```powershell
 kubectl logs <POD_NAME> -n <NAMESPACE>
 kubectl logs <POD_NAME> -n <NAMESPACE> --previous
 ```
 
-가능 원인:
-
-- Application 오류
-- 설정 오류
-- Secret/Config 누락
-- Database 연결 실패
-
 ---
 
-# 76. 오류 4 — ModuleNotFoundError
+# 83. 초급 실습에서 UI Upload 방식을 사용하는 이유
 
-예:
+SDK에서 KFP API에 직접 연결하려면 환경에 따라 다음 구성이 필요함.
 
-```text
-ModuleNotFoundError: No module named 'pandas'
-```
-
-해결:
-
-```python
-@dsl.component(
-    base_image="python:3.11-slim",
-    packages_to_install=["pandas"]
-)
-```
-
-또는 필요한 Package를 포함한 Custom Image 사용.
-
----
-
-# 77. 오류 5 — Artifact 파일 오류
-
-Output:
-
-```python
-output_data: Output[Dataset]
-df.to_csv(output_data.path, index=False)
-```
-
-Input:
-
-```python
-input_data: Input[Dataset]
-pd.read_csv(input_data.path)
-```
-
-Artifact의 실제 저장 URI를 코드에 직접 하드코딩하지 않음.
-
----
-
-# 78. 초급 실습에서 UI 업로드 방식을 사용하는 이유
-
-Notebook에서 KFP API를 직접 호출할 경우:
-
+- Authentication
 - ServiceAccount Token
-- Kubeflow 인증
 - Namespace
-- API Endpoint
+- KFP API Endpoint
 
-구성이 필요할 수 있음.
-
-따라서 초급 실습에서는:
+따라서 이번 실습에서는 다음 방식 사용.
 
 ```text
 Notebook
-  ↓
-YAML Compile
-  ↓
-YAML Download
-  ↓
+   │
+   ▼
+Compile
+   │
+   ▼
+IR YAML
+   │
+   ▼
 Kubeflow UI Upload
-  ↓
+   │
+   ▼
 Create Run
 ```
 
-방식을 사용함.
-
 ---
 
-# 79. 실습 종료
-
-본 실습에서는 **기존에 준비된 Kind Cluster를 다음 주차에도 재사용**하므로 Cluster를 삭제하지 않음.
-
-Dashboard Port Forward를 실행한 Terminal에서:
-
-```text
-Ctrl + C
-```
-
-로 Port Forward만 종료.
-
-Cluster 상태 확인:
-
-```powershell
-kind get clusters
-kubectl get nodes
-```
-
-> 주의  
-> `kind delete cluster`는 본 실습 종료 절차에 포함하지 않음.  
-> 6주차 Katib·KServe 실습에서도 동일 Kubeflow Cluster를 계속 사용함.
-
----
-
-# 80. 최종 확인 문제
+# 84. 최종 확인 문제
 
 ## 문제 1
+
+이번 실습에서 별도의 Kind Cluster를 만드는가?
+
+### 정답
+
+아님. Docker Desktop에서 이미 생성된 Kubernetes Cluster를 그대로 사용함.
+
+## 문제 2
+
+Kubeflow 설치 전에 확인해야 할 것은?
+
+### 정답
+
+- 현재 kubectl Context
+- Node 상태
+- Kubernetes Server Version
+- StorageClass
+- Docker Desktop Resource
+
+## 문제 3
 
 Component와 Pipeline의 차이는?
 
 ### 정답
 
-Component는 독립 작업 단위이고 Pipeline은 여러 Component를 연결한 Workflow임.
-
----
-
-## 문제 2
-
-Pipeline 실행 흐름을 표현하는 그래프 구조는?
-
-### 정답
-
-DAG
-
----
-
-## 문제 3
-
-다음 중 Parameter에 적합한 것은?
-
-```text
-A. 3 GB Dataset
-B. model.pkl
-C. learning_rate=0.01
-D. image dataset
-```
-
-### 정답
-
-C
-
----
+Component는 하나의 작업 정의이고 Pipeline은 여러 Component를 연결한 Workflow임.
 
 ## 문제 4
 
-Dataset과 Model을 Component 사이에서 전달할 때 사용하는 개념은?
+Pipeline 실행 흐름을 표현하는 그래프는?
 
 ### 정답
 
-Artifact
-
----
+DAG.
 
 ## 문제 5
+
+Dataset과 Model 파일을 Component 사이에서 전달할 때 사용하는 개념은?
+
+### 정답
+
+Artifact.
+
+## 문제 6
 
 Pipeline 1회 실행은?
 
 ### 정답
 
-Run
+Run.
 
----
-
-## 문제 6
+## 문제 7
 
 여러 Run을 묶는 단위는?
 
 ### 정답
 
-Experiment
-
----
-
-## 문제 7
-
-모델이 어떤 데이터와 실행으로 만들어졌는지 추적하는 개념은?
-
-### 정답
-
-ML Lineage
-
----
+Experiment.
 
 ## 문제 8
 
-KFP v2 Pipeline 컴파일 결과는?
+KFP v2에서 Pipeline을 컴파일하면 무엇이 생성되는가?
 
 ### 정답
 
-KFP v2 IR YAML
-
----
+KFP v2 IR YAML.
 
 ## 문제 9
 
-KFP v2는 반드시 Argo Workflows YAML로 변환되는가?
+KFP Task와 Kubernetes의 관계는?
 
 ### 정답
 
-아님. KFP v2는 Argo Workflows에 종속되지 않는 generic IR YAML을 사용함.
+Pipeline Task는 Kubernetes 환경에서 Container/Pod 기반 작업으로 실행됨.
 
 ---
 
-# 81. 오늘 실습의 핵심
+# 85. 오늘 실습 핵심
 
 ```text
-① Kubeflow 설치
-      ↓
-② Notebook 생성
-      ↓
-③ Component 작성
-   ├─ preprocess
-   ├─ train
-   └─ evaluate
-      ↓
-④ Artifact 연결
-   ├─ Dataset
-   ├─ Model
-   └─ Metrics
-      ↓
-⑤ Pipeline 정의
-      ↓
-⑥ DAG 구성
-      ↓
-⑦ Compiler
-      ↓
-⑧ IR YAML
-      ↓
-⑨ Run 실행
-      ↓
-⑩ Log / Artifact / Metrics 확인
-      ↓
-⑪ Experiment에서 여러 Run 비교
+[이미 준비됨]
+
+Docker Desktop
+      │
+      ▼
+Kubernetes Cluster
+      │
+      ▼
+kubectl
+
+[이번 실습]
+
+Kubeflow
+      │
+      ▼
+Central Dashboard
+      │
+      ▼
+Notebook
+      │
+      ▼
+KFP Component
+      │
+      ├─ preprocess
+      ├─ train
+      └─ evaluate
+      │
+      ▼
+Pipeline
+      │
+      ▼
+DAG
+      │
+      ▼
+IR YAML
+      │
+      ▼
+Run
+      │
+      ├─ Log
+      ├─ Artifact
+      ├─ Metrics
+      └─ Metadata
+      │
+      ▼
+Experiment
 ```
 
 ---
 
-# 82. 반드시 기억할 한 문장
+# 86. 반드시 기억할 한 문장
 
-> **ML Pipeline은 데이터 전처리, 학습, 평가 등의 작업을 DAG로 연결하고 자동 실행함으로써 재현성, 자동화, 재사용성, 추적성을 확보하는 기술임.**
+> **Kubeflow Pipelines는 Kubernetes 위에서 데이터 전처리, 학습, 평가 등의 ML 작업을 Component로 정의하고 DAG로 연결하여 자동 실행·추적하는 ML Workflow Orchestration 도구임.**
 
 ---
 
-# 83. 6주차 예고
+# 87. 다음 주차 연결
 
 ```text
 5주차
 
 preprocess
-   ↓
- train
-   ↓
+   │
+   ▼
+train
+   │
+   ▼
 evaluate
 ```
 
@@ -2325,44 +2079,49 @@ evaluate
 6주차
 
 Katib
-  ↓
+   │
+   ▼
 Hyperparameter Tuning
-  ↓
+   │
+   ▼
 train
-  ↓
+   │
+   ▼
 evaluate
-  ↓
+   │
+   ▼
 KServe
-  ↓
+   │
+   ▼
 Model Serving
 ```
 
 ---
 
-# 84. 강의 내용과 실습 대응표
+# 88. 강의 내용과 실습 대응표
 
 | 강의 내용 | 실습 |
 |---|---|
-| Pipeline 필요성 | 전처리→학습→평가 자동 실행 |
+| Pipeline 필요성 | 전처리→학습→평가 자동화 |
 | DAG | KFP Run DAG |
-| 재현성 | 동일 Pipeline 반복 실행 |
+| 재현성 | 동일 Pipeline 반복 Run |
 | 자동화 | 데이터 의존관계 기반 실행 |
 | 재사용성 | Component 함수 분리 |
-| 추적성 | Run/Artifact/Metrics 확인 |
-| Component | preprocess/train/evaluate |
+| 추적성 | Run / Artifact / Metrics / Log |
+| Component | preprocess / train / evaluate |
 | Pipeline | `simple_pipeline()` |
 | Run | `iris-run-*` |
 | Experiment | `iris-experiment` |
-| Artifact | Dataset/Model/Metrics |
-| ML Metadata | Artifacts/Executions |
-| Notebook | Jupyter 개발환경 |
-| Kubernetes 연결 | Task Pod 확인 |
+| Artifact | Dataset / Model / Metrics |
+| ML Metadata | Artifacts / Executions |
+| Notebook | Kubeflow Jupyter 환경 |
+| Kubernetes 연결 | Task Pod 관찰 |
 | Container 연결 | `base_image` |
-| 6주차 연결 | Katib/KServe |
+| 6주차 연결 | Katib / KServe |
 
 ---
 
-# 85. 참고문헌 및 공식 문서
+# 89. 참고문헌 및 공식 문서
 
 - Kubeflow Documentation  
   https://www.kubeflow.org/docs/
@@ -2373,26 +2132,69 @@ Model Serving
 - Kubeflow Community Distribution  
   https://github.com/kubeflow/community-distribution
 
-- Kubeflow Notebooks  
-  https://www.kubeflow.org/docs/components/notebooks/
-
-- Kubeflow Notebook Quickstart  
-  https://www.kubeflow.org/docs/components/notebooks/quickstart-guide/
+- Kubeflow 26.03 Release  
+  https://www.kubeflow.org/docs/kubeflow-distribution/releases/kubeflow-26.03/
 
 - Kubeflow Pipelines  
   https://www.kubeflow.org/docs/components/pipelines/
 
-- KFP User Guides  
-  https://www.kubeflow.org/docs/components/pipelines/user-guides/
+- KFP Getting Started  
+  https://www.kubeflow.org/docs/components/pipelines/getting-started/
 
 - KFP Components  
   https://www.kubeflow.org/docs/components/pipelines/user-guides/components/
 
-- KFP Core Functions  
-  https://www.kubeflow.org/docs/components/pipelines/user-guides/core-functions/
+- KFP Artifacts  
+  https://www.kubeflow.org/docs/components/pipelines/user-guides/data-handling/artifacts/
 
-- KFP Version Compatibility  
-  https://www.kubeflow.org/docs/components/pipelines/reference/version-compatibility/
+- KFP SDK 2.16.1  
+  https://pypi.org/project/kfp/2.16.1/
 
-- KFP SDK  
-  https://pypi.org/project/kfp/
+- Kustomize Releases  
+  https://github.com/kubernetes-sigs/kustomize/releases
+
+---
+
+# 부록 — 수업 진행 권장 순서
+
+```text
+1. docker version
+      ↓
+2. kubectl config current-context
+      ↓
+3. kubectl get nodes
+      ↓
+4. kubectl version
+      ↓
+5. kubectl get sc
+      ↓
+6. Kubeflow 다운로드
+      ↓
+7. kustomize build example | kubectl apply
+      ↓
+8. kubectl get pods -A
+      ↓
+9. Dashboard 접속
+      ↓
+10. Notebook 생성
+      ↓
+11. KFP SDK 설치
+      ↓
+12. preprocess Component
+      ↓
+13. train Component
+      ↓
+14. evaluate Component
+      ↓
+15. Pipeline 정의
+      ↓
+16. Compile
+      ↓
+17. YAML Upload
+      ↓
+18. Experiment 생성
+      ↓
+19. Run 실행
+      ↓
+20. DAG / Log / Artifact / Metrics 확인
+```
