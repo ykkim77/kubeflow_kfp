@@ -138,13 +138,13 @@ Kubernetes Runtime
 
 Windows Terminal 실행.
 
-```powershell
+```terminal
 docker version
 ```
 
 추가 확인.
 
-```powershell
+```terminal
 docker info
 ```
 
@@ -157,7 +157,7 @@ docker info
 
 # 7. 실습 2 — 현재 Kubernetes Context 확인
 
-```powershell
+```terminal
 kubectl config current-context
 ```
 
@@ -169,13 +169,13 @@ docker-desktop
 
 전체 Context 확인.
 
-```powershell
+```terminal
 kubectl config get-contexts
 ```
 
 필요한 경우 Docker Desktop Context로 변경.
 
-```powershell
+```terminal
 kubectl config use-context docker-desktop
 ```
 
@@ -183,7 +183,7 @@ kubectl config use-context docker-desktop
 
 # 8. 실습 3 — Kubernetes Node 확인
 
-```powershell
+```terminal
 kubectl get nodes
 ```
 
@@ -196,7 +196,7 @@ docker-desktop   Ready    control-plane   ...   v1.xx.x
 
 상세 확인.
 
-```powershell
+```terminal
 kubectl get nodes -o wide
 ```
 
@@ -208,13 +208,13 @@ kubectl get nodes -o wide
 
 # 9. 실습 4 — Kubernetes Server Version 확인
 
-```powershell
+```terminal
 kubectl version
 ```
 
 또는:
 
-```powershell
+```terminal
 kubectl version -o yaml
 ```
 
@@ -233,13 +233,13 @@ Kubeflow 26.03.1 실습에서는 Kubernetes Server Version `1.35+` 사용.
 
 Kubeflow Notebook과 Pipeline은 PVC를 사용할 수 있으므로 StorageClass 확인.
 
-```powershell
+```terminal
 kubectl get storageclass
 ```
 
 축약형:
 
-```powershell
+```terminal
 kubectl get sc
 ```
 
@@ -254,7 +254,7 @@ kubectl get sc
 
 # 11. 실습 6 — 현재 Kubernetes 상태 점검
 
-```powershell
+```terminal
 kubectl get pods -A
 ```
 
@@ -287,7 +287,7 @@ Docker Desktop의 Resources 설정에서 확인.
 
 # 13. 실습 7 — Git 확인
 
-```powershell
+```terminal
 git --version
 ```
 
@@ -297,7 +297,7 @@ Git이 없다면 Git for Windows 설치 필요.
 
 # 14. 실습 8 — Kustomize 확인
 
-```powershell
+```terminal
 kustomize version
 ```
 
@@ -319,25 +319,25 @@ https://github.com/kubernetes-sigs/kustomize/releases
 
 작업 디렉터리 이동.
 
-```powershell
+```terminal
 cd C:\workspace
 ```
 
 다운로드.
 
-```powershell
+```terminal
 git clone --branch 26.03.1 https://github.com/kubeflow/community-distribution.git
 ```
 
 이동.
 
-```powershell
+```terminal
 cd community-distribution
 ```
 
 버전 확인.
 
-```powershell
+```terminal
 git describe --tags
 ```
 
@@ -351,7 +351,7 @@ git describe --tags
 
 # 16. 설치 전 Context 재확인
 
-```powershell
+```terminal
 kubectl config current-context
 kubectl get nodes
 ```
@@ -364,8 +364,12 @@ Docker Desktop Kubernetes를 사용할 경우 현재 Context가 `docker-desktop`
 
 현재 Docker Desktop Kubernetes Cluster에 Kubeflow 전체 Manifest 적용.
 
-```powershell
-kustomize build example | kubectl apply --server-side --force-conflicts -f -
+```terminal
+while ! kustomize build example | \
+kubectl apply --server-side --force-conflicts -f -; do
+  echo "Retrying to apply resources"
+  sleep 20
+done
 ```
 
 ---
@@ -388,7 +392,7 @@ Custom Resource 생성
 
 이 경우 같은 명령을 다시 실행.
 
-```powershell
+```terminal
 kustomize build example | kubectl apply --server-side --force-conflicts -f -
 ```
 
@@ -417,7 +421,7 @@ Actual State
 
 # 20. 실습 11 — Namespace 확인
 
-```powershell
+```terminal
 kubectl get namespaces
 ```
 
@@ -438,19 +442,19 @@ auth
 
 # 21. 실습 12 — 전체 Pod 확인
 
-```powershell
+```terminal
 kubectl get pods -A
 ```
 
 Kubeflow Namespace만 확인.
 
-```powershell
+```terminal
 kubectl get pods -n kubeflow
 ```
 
 실시간 확인.
 
-```powershell
+```terminal
 kubectl get pods -n kubeflow -w
 ```
 
@@ -493,19 +497,19 @@ Error
 
 Deployment:
 
-```powershell
+```terminal
 kubectl get deploy -n kubeflow
 ```
 
 Service:
 
-```powershell
+```terminal
 kubectl get svc -n kubeflow
 ```
 
 Pipeline 관련 Pod:
 
-```powershell
+```terminal
 kubectl get pods -n kubeflow | Select-String pipeline
 ```
 
@@ -527,7 +531,7 @@ Kubeflow 자체도 Kubernetes Object의 조합으로 구성됨.
 
 # 24. 실습 14 — Istio Ingress 확인
 
-```powershell
+```terminal
 kubectl get svc -n istio-system
 ```
 
@@ -539,7 +543,7 @@ kubectl get svc -n istio-system
 
 Port Forward 실행.
 
-```powershell
+```terminal
 kubectl port-forward svc/istio-ingressgateway -n istio-system 8080:80
 ```
 
@@ -642,13 +646,13 @@ Jupyter Container
 
 Windows Terminal 새 탭에서:
 
-```powershell
+```terminal
 kubectl get pods -A
 ```
 
 Notebook 이름 검색.
 
-```powershell
+```terminal
 kubectl get pods -A | Select-String kfp-lab
 ```
 
@@ -1201,13 +1205,13 @@ Succeeded
 
 Windows Terminal에서:
 
-```powershell
+```terminal
 kubectl get pods -A
 ```
 
 실시간:
 
-```powershell
+```terminal
 kubectl get pods -A -w
 ```
 
@@ -1562,19 +1566,19 @@ FileNotFoundError
 
 # 75. Kubernetes에서도 오류 확인
 
-```powershell
+```terminal
 kubectl get pods -A
 ```
 
 상세:
 
-```powershell
+```terminal
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 ```
 
 Log:
 
-```powershell
+```terminal
 kubectl logs <POD_NAME> -n <NAMESPACE>
 ```
 
@@ -1842,7 +1846,7 @@ print("Pipeline compile 완료")
 
 ## 잘못된 Context
 
-```powershell
+```terminal
 kubectl config current-context
 kubectl config use-context docker-desktop
 kubectl get nodes
@@ -1850,7 +1854,7 @@ kubectl get nodes
 
 ## Kubernetes 버전 불일치
 
-```powershell
+```terminal
 kubectl version
 ```
 
@@ -1858,7 +1862,7 @@ Kubeflow 26.03.1은 Kubernetes 1.35+ 기준으로 사용.
 
 ## Pod Pending
 
-```powershell
+```terminal
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 ```
 
@@ -1872,7 +1876,7 @@ kubectl describe pod <POD_NAME> -n <NAMESPACE>
 
 ## PVC Pending
 
-```powershell
+```terminal
 kubectl get pvc -A
 kubectl get sc
 kubectl describe pvc <PVC_NAME> -n <NAMESPACE>
@@ -1880,13 +1884,13 @@ kubectl describe pvc <PVC_NAME> -n <NAMESPACE>
 
 ## ImagePullBackOff
 
-```powershell
+```terminal
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 ```
 
 ## CrashLoopBackOff
 
-```powershell
+```terminal
 kubectl logs <POD_NAME> -n <NAMESPACE>
 kubectl logs <POD_NAME> -n <NAMESPACE> --previous
 ```
