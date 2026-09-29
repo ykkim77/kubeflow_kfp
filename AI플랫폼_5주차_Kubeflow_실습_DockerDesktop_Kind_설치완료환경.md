@@ -15,12 +15,6 @@
 - Kubeflow Notebook 생성
 - KFP SDK 설치
 - `Component`, `Pipeline`, `DAG`, `Artifact`, `Run`, `Experiment` 개념 확인
-- 전처리 → 학습 → 평가 ML Pipeline 작성
-- Pipeline을 KFP v2 IR YAML로 컴파일
-- Kubeflow Pipelines UI에서 Pipeline 실행
-- DAG, Log, Artifact, Metrics 확인
-- 여러 Run을 Experiment에서 비교
-- KFP Task와 Kubernetes Pod의 관계 확인
 
 ---
 
