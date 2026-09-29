@@ -300,6 +300,11 @@ Git이 없다면 Git for Windows 설치 필요.
 ```terminal
 kustomize version
 ```
+```
+curl -s \
+  "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" \
+  | bash -s -- 5.8.1 /tmp
+```
 
 권장 버전:
 
