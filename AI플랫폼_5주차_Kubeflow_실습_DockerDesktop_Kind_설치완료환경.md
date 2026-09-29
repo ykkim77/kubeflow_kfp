@@ -330,7 +330,7 @@ https://github.com/kubernetes-sigs/kustomize/releases
 작업 디렉터리 이동.
 
 ```terminal
-cd C:\workspace
+cd ~
 ```
 
 다운로드.
